@@ -1,36 +1,48 @@
 import {
   Body,
   Controller,
-  Delete,
-  Param,
+  Get,
   Post,
-  Put,
+  Req,
   Res,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { Request, Response } from 'express';
+import { Public } from '../core';
 import { AuthService } from './auth.service';
+import { LocalAuthGuard } from './local.auth.guard';
 import { RegisterUserDto } from './dto/register-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { LoginUserDto } from './dto/login.user.dto';
+import { User } from '../database/entities/User';
 
+@ApiTags('Auth')
 @Controller('/api/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
+  @UsePipes(new ValidationPipe())
   @Post('/register')
-  async registerUser(@Res() res: Response, @Body() body: RegisterUserDto) {
+  async register(@Body() body: RegisterUserDto) {
     const resp = await this.authService.registerUser(body);
-    return res.status(201).json(resp);
-  }
-
-  @Put('/user/:id')
-  async updateUser(@Param('id') id: number, @Body() body: UpdateUserDto) {
-    const resp = await this.authService.updateUser(id, body);
     return resp;
   }
 
-  @Delete('/user/:id')
-  async deleteUser(@Res() res: Response, @Param('id') id: number) {
-    await this.authService.deleteUser(id);
-    return res.status(204).send();
+  @Public()
+  @UseGuards(LocalAuthGuard)
+  @UsePipes(new ValidationPipe())
+  @Post('/login')
+  login(@Req() req: Request, @Body() _: LoginUserDto, @Res() res: Response) {
+    const resp = this.authService.login(req.user as User);
+    return res.status(200).json({ accessToken: resp });
+  }
+
+  @ApiSecurity('bearer')
+  @Get('/profile')
+  getProfile(@Req() req: Request) {
+    return req.user;
   }
 }
